@@ -1,0 +1,64 @@
+#!/usr/bin/env ruby
+require 'rubygems'
+require 'optparse'
+require 'ruby-debug' rescue nil
+
+
+command     = nil
+uid         = nil
+sleep_value = nil
+
+["start", "stop", "restart"].each do |cmd|
+  if ARGV.include?( cmd)
+    command = cmd
+    break
+  end
+end
+
+OptionParser.new do |opts|
+  opts.on( "-u STR", "--uid=STR", String) do |s|
+    uid = s
+  end
+  opts.on( "-s F", "--sleep=F", Float) do |f|
+    sleep_value = f
+  end
+end.parse( ARGV)
+
+if command
+  require "daemons"
+  eval( "Daemons").run( File.join( File.dirname(__FILE__), "..", "lib", "async", "daemon.rb"), {
+    :app_name   => "async#{uid}",
+    :ARGV       => [command],
+    :dir_mode   => :script,
+    :dir        => File.join( "..", "..", "log", "async"),
+    :multiple   => uid ? false : true,
+    :monitor    => false,
+    :backtrace  => true,
+    :log_output => true
+  })
+else
+  require File.join( File.dirname( __FILE__), "..", "config", "environment.rb")
+  $running = true
+  Signal.trap( "TERM") do
+    $running = false
+  end
+  dots = 0
+  while $running
+    if t = AsyncTask.execute_next!
+      puts if dots > 0
+      puts( "#{Time.now.strftime( "%Y-%m-%d   %H:%M")}   #{t.success ? "SUCCESS" : "FAILURE"} #{sprintf "%6d", t.id}:   " +
+            "#{[Module,Class].include?( t.object.class) ? t.object.to_s : (t.object_type + "(" + t.object_id.to_s + ")")}##{t.action}  " +
+            (t.success ? "" : "#{t.result.class}: #{t.result.message}"))
+      dots = 0
+    else
+      print "."; $stdout.flush
+      dots = (dots + 1)%60
+      if dots%12 == 0
+        print " "; $stdout.flush
+      end
+      puts if dots == 0
+      sleep( sleep_value || 5)
+    end
+  end
+end
+

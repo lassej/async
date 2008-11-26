@@ -1,0 +1,467 @@
+<?xml version="1.0" encoding="iso-8859-1"?>
+<!DOCTYPE html 
+     PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>File: README</title>
+  <meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+  <meta http-equiv="Content-Script-Type" content="text/javascript" />
+  <link rel="stylesheet" href=".././rdoc-style.css" type="text/css" media="screen" />
+  <script type="text/javascript">
+  // <![CDATA[
+
+  function popupCode( url ) {
+    window.open(url, "Code", "resizable=yes,scrollbars=yes,toolbar=no,status=no,height=150,width=400")
+  }
+
+  function toggleCode( id ) {
+    if ( document.getElementById )
+      elem = document.getElementById( id );
+    else if ( document.all )
+      elem = eval( "document.all." + id );
+    else
+      return false;
+
+    elemStyle = elem.style;
+    
+    if ( elemStyle.display != "block" ) {
+      elemStyle.display = "block"
+    } else {
+      elemStyle.display = "none"
+    }
+
+    return true;
+  }
+  
+  // Make codeblocks hidden by default
+  document.writeln( "<style type=\"text/css\">div.method-source-code { display: none }</style>" )
+  
+  // ]]>
+  </script>
+
+</head>
+<body>
+
+
+
+  <div id="fileHeader">
+    <h1>README</h1>
+    <table class="header-table">
+    <tr class="top-aligned-row">
+      <td><strong>Path:</strong></td>
+      <td>README
+      </td>
+    </tr>
+    <tr class="top-aligned-row">
+      <td><strong>Last Update:</strong></td>
+      <td>Wed Nov 26 22:33:22 +0100 2008</td>
+    </tr>
+    </table>
+  </div>
+  <!-- banner header -->
+
+  <div id="bodyContent">
+
+
+
+  <div id="contextContent">
+
+    <div id="description">
+      <h1><a href="../classes/Async.html">Async</a> Rails Plugin</h1>
+<p>
+Simple background tasks for Ruby on Rails.
+</p>
+<h2>Example</h2>
+<p>
+Say you have a model Order which sends confirmation e-mails after creation:
+</p>
+<pre>
+  class Order &lt; ActiveRecord::Base
+
+    ...
+
+    def after_create
+      send_confirmation_email
+    end
+
+  end
+</pre>
+<p>
+After a user placed an order, the browser sometimes hangs for a few seconds
+because the mail server takes a bit longer to respond. With the <a
+href="../classes/Async.html">Async</a> plugin you can write this instead:
+</p>
+<pre>
+  class Order &lt; ActiveRecord::Base
+
+    ...
+
+    def after_create
+      async :send_confirmation_email
+    end
+
+  end
+</pre>
+<p>
+This method will return immediately and the e-mail sending is processed in
+background.
+</p>
+<h2>Getting Started</h2>
+<p>
+Download the plugin
+</p>
+<pre>
+  $ script/plugin ....
+</pre>
+<p>
+Generate the migration and script files
+</p>
+<pre>
+  $ script/generate async
+</pre>
+<p>
+Run migrations
+</p>
+<pre>
+  $ rake db:migrate
+</pre>
+<p>
+Start a (foreground) worker process
+</p>
+<pre>
+  $ script/async
+</pre>
+<p>
+This will execute all tasks that you scheduled by e.g.
+</p>
+<pre>
+  &gt;&gt; order.async :send_confirmation_mail
+</pre>
+<p>
+or
+</p>
+<pre>
+  &gt;&gt; order.schedule 2.days.from_now, :send_feedback_mail
+</pre>
+<p>
+or
+</p>
+<pre>
+  &gt;&gt; Newsletter.async :deliver_all
+</pre>
+<h2>Using the Daemons Gem</h2>
+<p>
+By installing the daemons gem you can easily put the worker processes in
+background
+</p>
+<pre>
+  $ sudo gem install daemons
+</pre>
+<p>
+start/stop/restart a background worker process by
+</p>
+<pre>
+  $ script/async {start|stop|restart}
+</pre>
+<h2>Features</h2>
+<ul>
+<li>Simple interface to calling methods asynchronously
+
+<ul>
+<li>All class methods
+
+</li>
+<li>All module methods
+
+</li>
+<li>All Model (ActiveRecord::Base derived) instance methods
+
+</li>
+</ul>
+</li>
+<li>Scheduling tasks for a certain time
+
+</li>
+<li>Prioritize tasks
+
+</li>
+<li>Provide function parameters
+
+</li>
+<li>Storing function results
+
+</li>
+<li>Storing exceptions
+
+</li>
+<li>Parallelize execution of tasks by multiple worker processes
+
+</li>
+</ul>
+<h2>Implementation</h2>
+<p>
+There are two methods, &quot;async&quot; and &quot;schedule&quot;, which
+are added as class methods to all classes and modules, and as instance
+methods to ActiveRecord::Base derived objects. If the async method is
+called on a class/method/model, a <a
+href="../classes/AsyncTask.html">AsyncTask</a> object is created which
+stores the class name and, if it&#8216;s a model, the model id in the
+database.
+</p>
+<p>
+Examples:
+</p>
+<pre>
+  &gt;&gt; Date.async :today
+
+  AsyncTask:
+    object_type: &quot;Date&quot;
+    object_id: nil
+    action: &quot;today&quot;
+    ...
+
+  &gt;&gt; order = Order.create( ...)
+  &gt;&gt; order.async :send_confirmation_mail
+
+  AsyncTask:
+    object_type: &quot;Order&quot;
+    object_id: 42
+    action: &quot;send_confirmation_mail&quot;
+    ...
+</pre>
+<h2>Multiple Worker Instances</h2>
+<p>
+Worker Processes can run in parallel. So if you want to put your multi-core
+processors or multiple servers to use you can start serveral daemons:
+</p>
+<pre>
+  $ script/async start
+  $ script/async start
+  $ ...
+</pre>
+<p>
+But in this case &quot;script/async stop&quot; would stop all running
+processes. To control worker processes individually you must provide a
+unique id:
+</p>
+<pre>
+  $ script/async start --uid=1
+  $ script/async start --uid=2
+</pre>
+<p>
+Then you can stop just the second one by
+</p>
+<pre>
+  $ script/async stop --uid=2
+</pre>
+<p>
+In production systems you will probably want to monitor these processes.
+See below for a sample configuration for the god monitoring utility.
+</p>
+<h2>Function Parameters</h2>
+<p>
+Function parameters can be passed as array in options[:args]. If you have a
+function
+</p>
+<pre>
+  class User &lt; ActiveRecord::Base
+
+    ...
+
+    def charge_credit_card( euro, cents)
+      ...
+    end
+
+  end
+</pre>
+<p>
+you can call it by
+</p>
+<pre>
+  &gt;&gt; async_task = user.async( :charge_credit_card, :args =&gt; [ 29, 90 ])
+  # =&gt; #&lt;AsyncTask id: ...
+</pre>
+<p>
+The parameter array is dumped as <a
+href="../classes/AsyncBinary.html">AsyncBinary</a> to the database. It can
+be accessed by
+</p>
+<pre>
+  &gt;&gt; async_task.args
+  # =&gt; [ 29, 90 ]
+</pre>
+<h2>Function Results</h2>
+<p>
+If the function is executed successfully the success flag is set and the
+return value of the function is dumped as <a
+href="../classes/AsyncBinary.html">AsyncBinary</a> to the database and can
+later be accessed through the result function
+</p>
+<pre>
+  &gt;&gt; async_task.success?
+  # =&gt; true
+
+  &gt;&gt; async_task.result
+  # =&gt; #&lt;SomeResult ...
+</pre>
+<h2>Error Handling</h2>
+<p>
+If an exception is raised during execution of the function the success flag
+is set to false and the exception object is stored as result
+</p>
+<pre>
+  &gt;&gt; async_task.success?
+  # =&gt; false
+
+  &gt;&gt; async_task.result
+  # =&gt; #&lt;RuntimeError ...
+
+  &gt;&gt; async_task.result.backtrace
+  # =&gt; [ ... (backtrace)
+</pre>
+<h2>Priority</h2>
+<p>
+It is possible to give some tasks a higher priority than others. The next
+task for execution is selected by first priority, then scheduled time, then
+database id. The default priority is 10.
+</p>
+<pre>
+  &gt;&gt; order.async :send_confirmation_mail, :priority =&gt; 12
+</pre>
+<h2>Scheduling</h2>
+<p>
+Tasks can be scheduled for a certain time:
+</p>
+<pre>
+  &gt;&gt; order.async :send_confirmation_mail, :scheduled_at =&gt; &quot;2008-11-18 03:00&quot;.to_time
+</pre>
+<p>
+If the async method is called without the :scheduled_at parameter it
+defaults to the current time. As a shortcut the schedule method is provided
+which takes the time as first parameter and additionally uses 20 as default
+priority.
+</p>
+<pre>
+  &gt;&gt; order.schedule &quot;2008-11-18 03:00&quot;.to_time, :send_confirmation_mail
+</pre>
+<h2>Using the God Gem to monitor Daemons</h2>
+<p>
+To use the god gem for monitoring the worker processes it must first be
+installed
+</p>
+<pre>
+  $ sudo gem install god
+</pre>
+<p>
+There is an example configuration file generated in config/async.god which
+starts and monitors one worker and restarts it if it crashes or if it
+exceeds a certain memory limit.
+</p>
+<pre>
+  $ god load -c config/async.god
+  $ god start async
+</pre>
+<p>
+If you want it to use more processes you can provide the -n parameter with
+the number of processes you want to start.
+</p>
+<pre>
+  $ god load -c config/async.god -- -n 3
+  $ god start async
+</pre>
+<p>
+Stopping all processes:
+</p>
+<pre>
+  $ god stop async
+</pre>
+<p>
+Quit the god daemon:
+</p>
+<pre>
+  $ god quit
+</pre>
+<h2>Capistrano Tasks</h2>
+<p>
+Example capistrano tasks without monitoring:
+</p>
+<pre>
+  namespace :async
+    desc &quot;Start async daemon&quot;
+    task :start do
+      run &quot;RAILS_ENV=production ruby #{current_path}/script/async start&quot;
+    end
+
+    desc &quot;Stop async daemon&quot;
+    task :start do
+      run &quot;RAILS_ENV=production ruby #{current_path}/script/async stop&quot;
+    end
+
+    desc &quot;Restart async daemon&quot;
+    task :start do
+      run &quot;RAILS_ENV=production ruby #{current_path}/script/async restart&quot;
+    end
+  end
+</pre>
+<p>
+With monitoring:
+</p>
+<pre>
+  namespace :async
+    desc &quot;Start async daemon&quot;
+    task :start do
+      run &quot;god load -c #{current_path}/config/async.god&quot;
+      run &quot;god start async&quot;
+    end
+
+    desc &quot;Stop async daemon&quot;
+    task :stop do
+      run &quot;god stop async&quot;
+      run &quot;god quit&quot;
+    end
+
+    desc &quot;Restart async daemon&quot;
+    task :start do
+      stop
+      start
+    end
+  end
+</pre>
+<p>
+Copyright (c) 2008 Lasse Jansen, released under the MIT license
+</p>
+
+    </div>
+
+
+   </div>
+
+
+  </div>
+
+
+    <!-- if includes -->
+
+    <div id="section">
+
+
+
+
+
+      
+
+
+    <!-- if method_list -->
+
+
+  </div>
+
+
+<div id="validator-badges">
+  <p><small><a href="http://validator.w3.org/check/referer">[Validate]</a></small></p>
+</div>
+
+</body>
+</html>

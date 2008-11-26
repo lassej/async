@@ -1,0 +1,307 @@
+= Async Rails Plugin
+
+Simple background tasks for Ruby on Rails.
+
+
+== Example
+
+Say you have a model Order which sends confirmation e-mails after creation:
+
+  class Order < ActiveRecord::Base
+
+    ...
+
+    def after_create
+      send_confirmation_email
+    end
+
+  end
+
+
+After a user placed an order, the browser sometimes hangs for a few seconds because the
+mail server takes a bit longer to respond. With the Async plugin you can write this instead:
+
+  class Order < ActiveRecord::Base
+
+    ...
+
+    def after_create
+      async :send_confirmation_email
+    end
+
+  end
+
+This method will return immediately and the e-mail sending is processed in background.
+
+
+
+== Getting Started
+
+
+Download the plugin
+
+  $ script/plugin ....
+
+
+Generate the migration and script files
+
+  $ script/generate async
+
+
+Run migrations
+
+  $ rake db:migrate
+
+
+Start a (foreground) worker process
+
+  $ script/async
+
+
+This will execute all tasks that you scheduled by e.g.
+
+  >> order.async :send_confirmation_mail
+
+or
+
+  >> order.schedule 2.days.from_now, :send_feedback_mail
+
+or
+
+  >> Newsletter.async :deliver_all
+
+
+== Using the Daemons Gem
+
+By installing the daemons gem you can easily put the worker processes in background
+
+  $ sudo gem install daemons
+
+start/stop/restart a background worker process by
+
+  $ script/async {start|stop|restart}
+
+
+== Features
+
+* Simple interface to calling methods asynchronously
+  * All class methods
+  * All module methods
+  * All Model (ActiveRecord::Base derived) instance methods
+* Scheduling tasks for a certain time
+* Prioritize tasks
+* Provide function parameters
+* Storing function results
+* Storing exceptions
+* Parallelize execution of tasks by multiple worker processes
+
+
+== Implementation
+
+There are two methods, "async" and "schedule", which are added as class methods to all
+classes and modules, and as instance methods to ActiveRecord::Base derived objects.
+If the async method is called on a class/method/model, a AsyncTask object is created
+which stores the class name and, if it's a model, the model id in the database.
+
+Examples:
+
+  >> Date.async :today
+
+  AsyncTask:
+    object_type: "Date"
+    object_id: nil
+    action: "today"
+    ...
+
+
+  >> order = Order.create( ...)
+  >> order.async :send_confirmation_mail
+
+  AsyncTask:
+    object_type: "Order"
+    object_id: 42
+    action: "send_confirmation_mail"
+    ...
+
+
+
+== Multiple Worker Instances
+
+Worker Processes can run in parallel. So if you want to put your multi-core processors
+or multiple servers to use you can start serveral daemons:
+
+  $ script/async start
+  $ script/async start
+  $ ...
+
+But in this case "script/async stop" would stop all running processes. To control
+worker processes individually you must provide a unique id:
+
+  $ script/async start --uid=1
+  $ script/async start --uid=2
+
+Then you can stop just the second one by
+
+  $ script/async stop --uid=2
+
+In production systems you will probably want to monitor these processes. See below
+for a sample configuration for the god monitoring utility.
+
+
+
+== Function Parameters
+
+Function parameters can be passed as array in options[:args]. If you have a
+function
+
+  class User < ActiveRecord::Base
+    
+    ...
+
+    def charge_credit_card( euro, cents)
+      ...
+    end
+
+  end
+
+you can call it by
+
+  >> async_task = user.async( :charge_credit_card, :args => [ 29, 90 ])
+  # => #<AsyncTask id: ...
+
+The parameter array is dumped as AsyncBinary to the database. It can be accessed by
+
+  >> async_task.args
+  # => [ 29, 90 ]
+
+
+
+== Function Results
+
+If the function is executed successfully the success flag is set and the return value of the
+function is dumped as AsyncBinary to the database and can later be accessed through the
+result function
+
+  >> async_task.success?
+  # => true
+
+  >> async_task.result
+  # => #<SomeResult ...
+
+
+== Error Handling
+
+If an exception is raised during execution of the function the success flag is set to false
+and the exception object is stored as result
+
+  >> async_task.success?
+  # => false
+
+  >> async_task.result
+  # => #<RuntimeError ...
+
+  >> async_task.result.backtrace
+  # => [ ... (backtrace)
+
+
+
+== Priority
+
+It is possible to give some tasks a higher priority than others. The next task for execution
+is selected by first priority, then scheduled time, then database id. The default priority
+is 10.
+
+  >> order.async :send_confirmation_mail, :priority => 12
+
+
+
+== Scheduling
+
+Tasks can be scheduled for a certain time:
+
+  >> order.async :send_confirmation_mail, :scheduled_at => "2008-11-18 03:00".to_time
+
+If the async method is called without the :scheduled_at parameter it defaults to the current time.
+As a shortcut the schedule method is provided which takes the time as first parameter and
+additionally uses 20 as default priority.
+
+  >> order.schedule "2008-11-18 03:00".to_time, :send_confirmation_mail
+
+
+
+== Using the God Gem to monitor Daemons
+
+To use the god gem for monitoring the worker processes it must first be installed
+
+  $ sudo gem install god
+
+There is an example configuration file generated in config/async.god which starts
+and monitors one worker and restarts it if it crashes or if it exceeds a certain
+memory limit.
+
+  $ god load -c config/async.god
+  $ god start async
+
+If you want it to use more processes you can provide the -n parameter with the number
+of processes you want to start.
+
+  $ god load -c config/async.god -- -n 3
+  $ god start async
+
+Stopping all processes:
+
+  $ god stop async
+
+Quit the god daemon:
+
+  $ god quit
+
+
+
+== Capistrano Tasks
+
+Example capistrano tasks without monitoring:
+
+  namespace :async
+    desc "Start async daemon"
+    task :start do
+      run "RAILS_ENV=production ruby #{current_path}/script/async start"
+    end
+
+    desc "Stop async daemon"
+    task :start do
+      run "RAILS_ENV=production ruby #{current_path}/script/async stop"
+    end
+
+    desc "Restart async daemon"
+    task :start do
+      run "RAILS_ENV=production ruby #{current_path}/script/async restart"
+    end
+  end
+
+
+With monitoring:
+
+  namespace :async
+    desc "Start async daemon"
+    task :start do
+      run "god load -c #{current_path}/config/async.god"
+      run "god start async"
+    end
+
+    desc "Stop async daemon"
+    task :stop do
+      run "god stop async"
+      run "god unmonitor async"
+    end
+
+    desc "Restart async daemon"
+    task :start do
+      stop
+      start
+    end
+  end
+
+
+
+Copyright (c) 2008 Lasse Jansen, released under the MIT license

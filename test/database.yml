@@ -1,0 +1,4 @@
+sqlite:
+  adapter: sqlite
+  dbfile: vendor/plugins/async_jobs/test/async_jobs.sqlite.db
+
