@@ -262,19 +262,19 @@ Quit the god daemon:
 
 Example capistrano tasks without monitoring:
 
-  namespace :async
+  namespace :async do
     desc "Start async daemon"
     task :start do
       run "RAILS_ENV=production ruby #{current_path}/script/async start"
     end
 
     desc "Stop async daemon"
-    task :start do
+    task :stop do
       run "RAILS_ENV=production ruby #{current_path}/script/async stop"
     end
 
     desc "Restart async daemon"
-    task :start do
+    task :restart do
       run "RAILS_ENV=production ruby #{current_path}/script/async restart"
     end
   end
@@ -282,7 +282,7 @@ Example capistrano tasks without monitoring:
 
 With monitoring:
 
-  namespace :async
+  namespace :async do
     desc "Start async daemon"
     task :start do
       run "god load -c #{current_path}/config/async.god"

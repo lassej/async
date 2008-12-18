@@ -26,6 +26,9 @@ end.parse( ARGV)
 
 if command
   require "daemons"
+
+  FileUtils.mkdir_p( File.join( File.dirname( __FILE__), "..", "log", "async"))
+
   eval( "Daemons").run( File.join( File.dirname(__FILE__), "..", "lib", "async", "daemon.rb"), {
     :app_name   => "async#{uid}",
     :ARGV       => [command],
