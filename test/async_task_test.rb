@@ -19,6 +19,18 @@ class AsyncTaskTest < Test::Unit::TestCase
     assert_equal true, task.finished?
   end
 
+  def test_cancel!
+    task = SomeClass.async( :some_method)
+
+    assert task.unfinished_task
+    task.cancel!
+    task.reload
+
+    assert_nil task.unfinished_task
+    assert task.cancelled?
+    assert task.finished?
+  end
+
   def test_unfinished_task_is_generated
     task = SomeClass.async( :some_method)
     

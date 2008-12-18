@@ -110,6 +110,15 @@ class AsyncTask < ActiveRecord::Base
     return self.result
   end
 
+  def cancel!
+    transaction do
+      self.update_attributes( :cancelled => true, :finished_at => Time.now.utc)
+      if u = self.unfinished_task
+        u.destroy
+      end
+    end
+  end
+
   def started?
     started_at ? true : false
   end
